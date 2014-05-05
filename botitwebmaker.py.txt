@@ -1,0 +1,266 @@
+"""Standalone program to convert directory tree of images, movies, pdfs and text to HTML.  
+
+This module has one function getFullDirPaths, which takes an argument 'path' and 
+returns a sorted list of full directory paths in the path beneath the path argument. 
+
+When started as a standalone program, getFullDirPaths() is called to get a list of all 
+the full-path directories in the tree.  For each directory in the list returned by 
+getFullDirPaths(), the script:
+
+1. creates an index.html file for each directory. 
+2. creates an HTML file for each jpg in that directory.
+3. creates a thumbnail image, size 128x128px, for each jpg in that directory
+
+When creating the index.html file for each directory, a table of images and links 
+are generated containing links to the image, pdfs, and movies in that directory.  The 
+names of every file are listed and an image is used to link to the same location.  The 
+index.html file also has keywords placed into is META headers.  These keywords come 
+from a text file in the directory that has the same name as the directory, except with 
+a '.txt' on the end of it.  For example, if the directory "Bacteria" contains a file 
+named "Bacteria.txt", then the contents of the file "Bacteria.txt" will be inserted 
+into the meta-keywords section of the resulting index.html file.  The index.html file 
+gets its header from a file whose path is in the global variable "ht1filename" and the 
+footer of index.html comes from a file whose path is in the global "ht5filename".  The 
+three global variables, path, ht1filename and ht5filename hold, respectively, the path 
+to the directory tree we want to build HTML for, the header of index.html files and the 
+footer of index.html files.  One index.html file is created for each directory in the 
+tree, and they all have the same header/footer information.  These header/footer files 
+are (unfortunately) somewhat "proprietary" and hence the html that is generated is 
+proprietary.  This "proprietariness" is necessary because we wish to maintain the 
+existing look-and-feel of existing HTML.  
+
+The files needed to run the program include:
+1. botitwebmaker.py (the main program...this file you're reading now)
+2. folder.gif, qt.png, pdf.png (128x128px graphics at the web document root)
+3. ht1.html and ht5.html (HTML files with suitable header/footer HTML contents)
+
+The global variables that must be set properly (in this file) are:
+1. path (full path to the directory tree of images, etc. that you want to operate on).
+2. ht1filename (full path to the HTML file holding the header HTML for index.html files).
+3. ht5filename (full path to the HTML file holding the footer HTML for index.html files).
+
+The above 3 global variables are the ONLY things that should be changed in this file.  
+If you want to significantly change the HTML, for example if you want to change the 
+contents of ht1filename and ht5filename, then it is very likely that you will need to 
+change the python code.  Because the python code prints out a 4 column table that 
+is started in ht1filename (and ended in ht5filename), you are stuck with this table.  
+
+This program makes heavy use of the os and re modules which should be already there.  
+
+This program makes use of ImageMagick's "convert" program.  os.system() is used to 
+start a separate process to run convert to generate the 128x128 thumbnails of jpgs.  
+To install ImageMagick on ubuntu-like linuxes, try this:
+root@lin# apt-cache search agick
+root@lin# apt-get install imagemagick
+To install ImageMagick on a Mac, try installing MacPorts from macports.com and then 
+use the port tool to install ImageMagick.  Otherwise you could try to install ImageMagick 
+by downloading a suitable Mac installation file.
+You'll know you can use "convert" if its available on your system:
+root@lin# convert --help
+
+This program should run to completion without generating any errors.  With a very large 
+directory of images, however, some bad things will happen.  The code handles almost 
+all of the classic problems.  It deals well with:
+
+1. Files that are not there.
+2. Files and directories with funny characters (like spaces) in their names.
+3. Unexpected file types (MSWord, MSExcel docs)
+4. Imagemagick convert errors. 
+
+ImageMagick's convert is run as a separate process using os.system() and its result is 
+checked.  If the convert command fails, it should generate messages to the console.  
+This program also generates and prints error messages to the console for convert failure. 
+convert fails for lots of reasons including "Premature end of JPEG file" which can 
+occur if a camera's battery dies or if a download never finished or if the JPEG is 
+bad.  You will see messages from convert that will specify the full path to corrupt 
+files which you can use to fix any broken jpegs.  Jpegs that are broken, according to 
+convert, may still display okay but the thumbnail won't get created properly and so 
+the table of image thumbnails won't ultimately render properly.  Fixing broken jpegs 
+and re-running the program might fix that problem.  Logic could be added to this 
+program to deal with that situation in a few ways including:
+
+1. It could generate HTML that uses the original file, but with size 128x128.
+2. It could display a catchall thumbnail to sit in for the thumbnail that failed to 
+be created. 
+
+/**Copyright (C) 2008 Thomas Maher
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+
+"""
+
+import os
+import re
+
+path = "/Volumes/WebDrive/images11/"
+ht1filename = "/Volumes/WebDrive/ht1.html"
+ht5filename = "/Volumes/WebDrive/ht5.html"
+
+def getFullDirPaths(path=path):
+    """Returns a list  of full paths to all the dirs in a directory recursively"""
+    fulldirpathcollection = []
+    for dirpath, dirnames, filenames in os.walk(path):
+        for dir in dirnames:
+            fulldirpath = os.path.join(dirpath, dir)
+            fulldirpathcollection.append(fulldirpath)
+    fulldirpathcollection.sort()
+    return fulldirpathcollection
+
+if __name__ == "__main__":
+    for localdir in getFullDirPaths():
+         tableflag = 3
+         indexhtml = ''
+         try:
+             fsock = open(ht1filename)
+             try: 
+                 indexhtml = fsock.read()
+             finally:
+                 fsock.close()
+         except IOError:
+                     print 'IOERROR HAPPENED ht1\n'
+                     pass
+         indexhtmlclean = indexhtml
+         for file in os.listdir(localdir):
+             pattern = '.txt$'
+             if(re.search(pattern, file.lower())):
+                 continue 
+             pattern = 'index.html'
+             if(re.search(pattern, file.lower())):
+                 continue 
+             pattern = '.ds_store'
+             if(re.search(pattern, file.lower())):
+                 continue 
+             tableflag += 3
+             matchobjjpg = re.search('.jpg$', file.lower())
+             matchobjpdf = re.search('.pdf$', file.lower())
+             matchobjmov = re.search('.mov$', file.lower())
+             matchobjgif = re.search('.gif$', file.lower())
+             matchobjpng = re.search('.png$', file.lower())
+             if (matchobjjpg):
+                 pattern = '_'
+                 filetitle = re.sub(pattern, ' ', file)
+                 pattern = '.jpg'
+                 filetitle = re.sub(pattern, '', filetitle)
+                 pattern = '^'
+                 filetitle = re.sub(pattern, 'Image: ', filetitle)
+                 pattern = '<img.*'
+                 jpghtml = re.sub(pattern, filetitle, indexhtmlclean)
+                 pattern = '<T.*'
+                 jpghtml = re.sub(pattern, '', jpghtml, 6)
+                 pattern = '</TR>'
+                 jpghtml = re.sub(pattern, '<TABLE><TR><TD>', jpghtml)
+                 jpghtml += '<BR><a href="' + file + '"><img src="' + file + '"></a><br>' + '\n'
+                 jpghtml += '</body></html>'
+                 jpgfilename = localdir + '/' + file + '.html'
+                 try:
+                     fsock = open(jpgfilename, 'w')
+                     try: 
+                         fsock.write(jpghtml)
+                     finally:
+                         fsock.close()
+                 except IOError:
+                     print 'IOERROR HAPPENED jpgfile\n'
+                     pass
+                 try:
+                     #use convert (a command in imagemagick) to make thumbnail 128x128
+                     cmd = "convert -resize 128x128 '" + os.path.join(localdir, file) + "' '" + os.path.join(localdir, file) + ".tn.jpg'"
+                     result = os.system(cmd)
+                     if(result != 0):
+                         print 'convert failed on: ' + file
+                 except IOError:
+                     print 'convert failed and exception was caught on: ' + file
+                     pass
+                 if(tableflag % 2):
+                     #indexhtml += '<td width="128" height="128"><a href="' + file + '.html"><img src="' + file + '" height=128 width=128></a><br></td><td><a href="' + file + '.html">' + file + '</a></td></tr>' + '\n'
+                     indexhtml += '<td width="128" height="128"><a href="' + file + '.html"><img src="' + file + '.tn.jpg" height=128 width=128></a><br></td><td><a href="' + file + '.html">' + file + '</a></td></tr>' + '\n'
+                 else:
+                     #indexhtml += '<tr><td width="128" height="128"><a href="' + file + '.html"><img src="' + file + '" height=128 width=128></a><br></td><td><a href="' + file + '.html">' + file + '</a></td>' + '\n'
+                     indexhtml += '<tr><td width="128" height="128"><a href="' + file + '.html"><img src="' + file + '.tn.jpg" height=128 width=128></a><br></td><td><a href="' + file + '.html">' + file + '</a></td>' + '\n'
+             elif (matchobjpng):
+                 if(tableflag % 2):
+                     indexhtml += '<td width="128" height="128"><a href="' + file + '"><img src="' + file + '" height=128 width=128></a></td><td><a href="' + file + '">' + file + '</a><br></td></tr>' + '\n'
+                 else:
+                     indexhtml += '<tr><td width="128" height="128"><a href="' + file + '"><img src="' + file + '" height=128 width=128></a></td><td><a href="' + file + '">' + file + '</a><br></td>' + '\n'
+             elif (matchobjgif):
+                 if(tableflag % 2):
+                     indexhtml += '<td width="128" height="128"><a href="' + file + '"><img src="' + file + '" height=128 width=128></a></td><td><a href="' + file + '">' + file + '</a><br></td></tr>' + '\n'
+                 else:
+                     indexhtml += '<tr><td width="128" height="128"><a href="' + file + '"><img src="' + file + '" height=128 width=128></a></td><td><a href="' + file + '">' + file + '</a><br></td>' + '\n'
+             elif (matchobjpdf):
+                 if(tableflag % 2):
+                     indexhtml += '<td width="128" height="128"><a href="' + file + '"><img src="/pdf.png"></a></td><td><a href="' + file + '">' + file + '</a><br></td></tr>' + '\n'
+                 else:
+                     indexhtml += '<tr><td width="128" height="128"><a href="' + file + '"><img src="/pdf.png"></a></td><td><a href="' + file + '">' + file + '</a><br></td>' + '\n'
+             elif (matchobjmov):
+                 if(tableflag % 2):
+                     indexhtml += '<td width="128" height="128"><a href="' + file + '"><img src="/qt.png"></a></td><td><a href="' + file + '">' + file + '</a><br></td></tr>' + '\n'
+                 else:
+                     indexhtml += '<tr><td width="128" height="128"><a href="' + file + '"><img src="/qt.png"></a></td><td><a href="' + file + '">' + file + '</a><br></td>' + '\n'
+             else:
+                 if(tableflag % 2):
+                     indexhtml += '<td width="128" height="128"><a href="' + file + '"><img src="/folder.gif"></a></td><td><a href="' + file + '">' + file + '</a><br></td></tr>' + '\n'
+                 else:
+                     indexhtml += '<tr><td width="128" height="128"><a href="' + file + '"><img src="/folder.gif"></a></td><td><a href="' + file + '">' + file + '</a><br></td>' + '\n'
+         if(tableflag % 2):
+             #indexhtml += '</table></body></html>'
+             indexhtml += '</table>'
+         else:
+             #indexhtml += '<td>&nbsp;</td></tr></table></body></html>'
+             indexhtml += '<td>&nbsp;</td></tr></table>'
+
+
+         try:
+             fsock = open(ht5filename)
+             try: 
+                 indexhtml += fsock.read()
+             finally:
+                 fsock.close()
+         except IOError:
+                     print 'IOERROR HAPPENED ht5\n'
+                     pass
+
+
+         try:
+             keywordstextfilename = localdir
+             pattern = '.*/'
+             keywordstextfilename = re.sub(pattern, '', keywordstextfilename)
+             keywordstextfilename = localdir + '/' + keywordstextfilename + '.txt'
+             try:
+                 fsock = open(keywordstextfilename)
+                 try: 
+                     keywords = fsock.read()
+                     pattern = '\W'
+                     keywords = re.sub(pattern, ' ', keywords, 999999)
+                     pattern = ' '
+                     keywords = re.sub(pattern, ' ', keywords, 999999)
+                     pattern = '<META name="keywords" content=",.*>'
+                     replacement = '<META name="keywords" content=",' + keywords + '">'
+                     indexhtml = re.sub(pattern, replacement, indexhtml)
+                 finally:
+                     fsock.close()
+             except IOError:
+                     #print 'IOERROR HAPPENED keywords\n'
+                     pass
+             
+             indexfilename = localdir + '/index.html'
+             fsock = open(indexfilename, 'w')
+             try: 
+                 fsock.write(indexhtml)
+             finally:
+                 fsock.close()
+         except IOError:
+             print 'IOERROR HAPPENED index\n'
+             pass
+ 
